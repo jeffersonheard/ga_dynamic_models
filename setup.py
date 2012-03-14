@@ -16,12 +16,12 @@
 
 ####### EDIT BELOW THIS LINE ##################################################
 
-name = 'ga_ows'
-version = '0.2'
-packages = ['ga_ows', 'ga_ows.views', 'ga_ows.rendering', 'ga_ows.models']
+name = 'ga_dynamic_models'
+version = '0.1'
+packages = ['ga_dynamic_models']
 author = 'Jeff Heard'
 author_email = 'jeff@renci.org'
-description = 'Geoanalytics core application for OGC webservices'
+description = 'Geoanalytics core application for uploading data'
 url = 'http://geoanalytics.renci.org'
 
 ####### DO NOT EDIT BELOW THIS LINE UNLESS YOU CAN'T HELP IT ##################
