@@ -71,102 +71,9 @@ Additionally, look for how to expose modules in wms/wfs in ows.py and in Tastypi
 """
 
 from django.conf import settings
-from django.db import models
 from django.db.models.base import ModelBase
-import importlib
 from logging import getLogger
-import ga_ows.utils
-from pprint import pprint
-
-def print_locals(fun):
-    def wrapper(**kwargs):
-        print fun.__name__
-        pprint(kwargs)
-        return fun(**kwargs)
-    return wrapper
-
-def print_imports(fun):
-    global _imports
-    def wrapper(kwargs):
-        ret = fun(kwargs)
-        print fun.__name__
-        for k, v in _imports.items():
-            print (k, v.__name__)
-        return ret
-    return wrapper
-
-@print_imports
-def _ensure_import(module):
-    global _imports
-    if module not in _imports:
-        _imports[module] = importlib.import_module(module)        
-    return _imports[module]
-
-def _parse_item(item):
-    ret = item
-    if isinstance(item, dict):
-        t = item['type']
-        if t == 'callable':
-            ret = _parse_callable(**t)
-        elif t == 'attribute':
-            ret = _parse_attribute(**t)
-        elif t == 'class_attribute':
-            ret = _parse_class_attribute(**t)
-        elif t == 'class_method':
-            ret = _parse_class_method(**t)
-        elif t == 'datetime':
-            ret = ga_ows.utils.parsetime(item['value'])
-    else:
-        try:
-            ret = int(item) # correct for the fact that JSON doesn't differentiate between ints and floats
-        except ValueError:
-            pass
-    return ret
-
-def _parse_positionals(parameters):
-    if 'positionals' in parameters:
-        return [_parse_item(it) for it in parameters['positionals']]
-    else:
-        return []
-
-def _parse_keywords(parameters):
-    if 'keywords' in parameters:
-        return dict([(key, _parse_item(value)) for key, value in parameters['keywords'].items()])
-    else:
-        return {}
-
-def _parse_bases(bases):
-    return tuple([_parse_attribute(**base) for base in bases])
-
-
-def _parse_callable(type, module, callable, parameters):
-    m=_ensure_import(module)
-    return m.__getattribute__(callable)(*_parse_positionals(parameters), **_parse_keywords(parameters))
-
-def _parse_attribute(type, module, attribute):
-    m=_ensure_import(module)
-    return m.__getattribute__(attribute)
-
-def _parse_class_attribute(type, module, cls, attribute):
-    m=_ensure_import(module)
-    c = m.__getattribute__(cls)
-    return c.__getattribute__(attribute)
-
-def _parse_class_method(type, module, cls, method, parameters):
-    m=_ensure_import(module)
-    m.__getattribute__(cls).__getattribute__(method)(*_parse_positionals(parameters), **_parse_keywords(parameters))
-
-def _parse_meta(**kwds):
-    return type("Meta", (object,), kwds)
-
-def _parse_model(name, bases, fields, meta, **kwargs):
-    name = name.encode('ascii')
-    fs =  dict([(n.encode('ascii'), _parse_callable(**f)) for n, f in fields.items()])
-    fs['Meta'] = _parse_meta(**meta)
-    fs['__metaclass__'] = ModelBase
-    fs['__module__'] = __name__
-
-    return type(name, _parse_bases(bases), fs)
+from ga_dynamic_models.parser import Parser
 
 if not hasattr(settings, "MONGODB_ROUTES"):
     raise AttributeError('MONGODB_ROUTES must be filled in')
@@ -181,16 +88,14 @@ else:
 _coll = _db['ga_dynamic_models__models']
 _dynamic_models = _coll.find()
 
-_imports = {
-    'django.db.models' : importlib.import_module('django.db.models'),
-    'django.contrib.gis.db.models' : importlib.import_module('django.contrib.gis.db.models')
-}
-
 __all__ = []
 
 g = globals()
+p = Parser(__name__, ModelBase)
 for model in _dynamic_models:
-    g[model['name']] = _parse_model(**model)
-    __all__.append(model['name'])
-
+    try:
+        g[model['name']] = p.parse(**model)
+        __all__.append(model['name'])
+    except Exception as e:
+        _log.error("Error creating {model}".format(model=model), str(e))
 
