@@ -98,4 +98,4 @@ for model in _dynamic_models:
         __all__.append(model['name'])
     except Exception as e:
         _log.error("Error creating {model}".format(model=model), str(e))
-
+        print e

@@ -18,7 +18,7 @@
 
 name = 'ga_dynamic_models'
 version = '0.1'
-packages = ['ga_dynamic_models']
+packages = ['ga_dynamic_models', 'ga_dynamic_models.views']
 author = 'Jeff Heard'
 author_email = 'jeff@renci.org'
 description = 'Geoanalytics core application for uploading data'

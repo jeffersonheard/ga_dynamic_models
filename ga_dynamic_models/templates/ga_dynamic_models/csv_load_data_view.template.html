@@ -1,0 +1,12 @@
+<html>
+<head><title>Load data into a data model</title></head>
+<body>
+<h1>Upload CSV to Geoanalytics</h1>
+<hr>
+<form action="." method='POST' enctype="multipart/form-data">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <input value="Upload CSV file" type="submit" />
+</form>
+</body>
+</html>

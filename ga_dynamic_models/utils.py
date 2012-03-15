@@ -12,7 +12,8 @@ Usage is similar to this::
     declare_model(mymodel)
 """
 from django.conf import settings
-
+import importlib
+import sys
 
 def method(method, *parameters):
     return {
@@ -157,6 +158,7 @@ def declare_model(model, replace=False, user=None, syncdb=False):
         model['_owner'] = None
 
     one = _db['ga_dynamic_models__models'].find_one(model['name'], fields=['_id', '_owner'])
+    print "found old model"
     if not one:
         _db['ga_dynamic_models__models'].insert(model, safe=True)
     elif replace and ((not one['owner']) or user.pk == one['owner']):
@@ -164,18 +166,19 @@ def declare_model(model, replace=False, user=None, syncdb=False):
     else:
         raise Exception("Cannot insert model record")
 
+    print "inserted new model"
+    print "syncdb"
     if syncdb:
-        import subprocess
-        import sys
-        import os
-        path = os.environ['VIRTUAL_ENV']
-        s = subprocess.Popen([os.path.join(path, bin, "python"), os.path.join(path, 'ga', "manage.py"), "syncdb"], stdout=sys.stdout, stderr=sys.stderr)
-        s.wait()
+        m = get_model(model['name'])
+
+        from django.core.management import call_command
+        call_command('syncdb', noinput=True)
+    print "syncdb finished"
 
 def drop_resource(model, user=None):
     _db = get_connection()
 
-    if isinstance(model, str):
+    if isinstance(model, str) or isinstance(model, unicode):
         one = _db['ga_dynamic_models__api'].find_one(model, fields=['_id', '_owner'])
     else:
         one = _db['ga_dynamic_models__api'].find_one(model['name'], fields=['_id', '_owner'])
@@ -185,10 +188,9 @@ def drop_resource(model, user=None):
             _db['ga_dynamic_models__api'].remove(model)
         else:
             raise Exception("Cannot delete resource record")
-    else:
-        raise Exception("Cannot delete resource record")
 
-def declare_resource(model, replace=False, user=None, syncdb=False):
+
+def declare_resource(model, replace=False, user=None):
     model['_id'] = model['name']
 
     _db = get_connection()
@@ -206,29 +208,21 @@ def declare_resource(model, replace=False, user=None, syncdb=False):
     else:
         raise Exception("Cannot insert resource record")
 
-    if syncdb:
-        import subprocess
-        import sys
-        import os
-        path = os.environ['VIRTUAL_ENV']
-        s = subprocess.Popen([os.path.join(path, bin, "python"), os.path.join(path, 'ga', "manage.py"), "syncdb"], stdout=sys.stdout, stderr=sys.stderr)
-        s.wait()
-
 def drop_model(model, user=None):
     _db = get_connection()
 
-    if isinstance(model, str):
-        one = _db['ga_dynamic_models__models'].find_one(model, fields=['_id', 'owner'])
-    else:
-        one = _db['ga_dynamic_models__models'].find_one(model['name'], fields=['_id', 'owner'])
+    one = _db['ga_dynamic_models__models'].find_one(model, fields=['_id', 'owner'])
 
     if one:
         if '_owner' not in one or not one['_owner'] or one['_owner'] == user.pk:
             _db['ga_dynamic_models__models'].remove(model)
+            try:
+                m = get_model(model)
+                m.objects.all().delete()
+            except AttributeError:
+                pass
         else:
             raise Exception("Cannot delete model record")
-    else:
-        raise Exception("Cannot delete model record")
 
 def get_connection():
     if 'ga_dynamic_models' in settings.MONGODB_ROUTES:
@@ -236,3 +230,15 @@ def get_connection():
     else:
         _db = settings.MONGODB_ROUTES['default']
     return _db
+
+def get_model(model):
+    try:
+        del sys.modules['ga_dynamic_models.models']
+    except KeyError:
+        pass
+
+    models = importlib.import_module('ga_dynamic_models.models')
+    if hasattr(models, model):
+        return models.__getattribute__(model)
+    else:
+        raise AttributeError("No such model")

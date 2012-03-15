@@ -29,10 +29,10 @@ api = Api('ga_dynamic_models')
 g = globals()
 p = Parser(__name__, ModelDeclarativeMetaclass)
 for res in _dynamic_model_resources:
-    #try:
+    try:
         cls = p.parse(**res)
         g[res['name']] = cls
         __all__.append(res['name'])
         api.register(cls())
-    #except Exception as e:
-    #    _log.error('Trouble creating resource {res}'.format(res=res), str(e))
+    except Exception as e:
+        _log.error('Trouble creating resource {res}'.format(res=res), str(e))
