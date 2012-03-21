@@ -74,6 +74,18 @@ from django.conf import settings
 from django.db.models.base import ModelBase
 from logging import getLogger
 from ga_dynamic_models.parser import Parser
+from datetime import datetime
+from ga_dynamic_models import utils
+
+__now__ = datetime.utcnow()
+
+from django.core.signals import request_started
+
+def my_callback(sender, *args, **kwargs):
+    utils.reload_if_updated(__now__, __name__)
+
+request_started.connect(my_callback)
+
 
 if not hasattr(settings, "MONGODB_ROUTES"):
     raise AttributeError('MONGODB_ROUTES must be filled in')
@@ -99,3 +111,4 @@ for model in _dynamic_models:
     except Exception as e:
         _log.error("Error creating {model}".format(model=model), str(e))
         print e
+

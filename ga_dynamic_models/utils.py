@@ -14,6 +14,9 @@ Usage is similar to this::
 from django.conf import settings
 import importlib
 import sys
+from datetime import datetime
+from django.core.management import call_command
+from django.db import connection, transaction
 
 def method(method, *parameters):
     return {
@@ -171,9 +174,11 @@ def declare_model(model, replace=False, user=None, syncdb=False):
     if syncdb:
         m = get_model(model['name'])
 
-        from django.core.management import call_command
-        call_command('syncdb', noinput=True)
+
+        call_command('syncdb', interactive=False)
     print "syncdb finished"
+
+    declare_updated()
 
 def drop_resource(model, user=None):
     _db = get_connection()
@@ -188,6 +193,7 @@ def drop_resource(model, user=None):
             _db['ga_dynamic_models__api'].remove(model)
         else:
             raise Exception("Cannot delete resource record")
+    declare_updated()
 
 
 def declare_resource(model, replace=False, user=None):
@@ -208,6 +214,8 @@ def declare_resource(model, replace=False, user=None):
     else:
         raise Exception("Cannot insert resource record")
 
+    declare_updated()
+
 def drop_model(model, user=None):
     _db = get_connection()
 
@@ -215,14 +223,19 @@ def drop_model(model, user=None):
 
     if one:
         if '_owner' not in one or not one['_owner'] or one['_owner'] == user.pk:
-            _db['ga_dynamic_models__models'].remove(model)
             try:
                 m = get_model(model)
-                m.objects.all().delete()
+                cursor = connection.cursor()
+                cursor.execute("DROP TABLE " + m._meta.db_table)
+                transaction.commit_unless_managed()
+                print "deleted table"
+                _db['ga_dynamic_models__models'].remove(model)
             except AttributeError:
                 pass
         else:
             raise Exception("Cannot delete model record")
+        declare_updated()
+        call_command('syncdb', interactive=False)
 
 def get_connection():
     if 'ga_dynamic_models' in settings.MONGODB_ROUTES:
@@ -242,3 +255,27 @@ def get_model(model):
         return models.__getattribute__(model)
     else:
         raise AttributeError("No such model")
+
+def declare_updated():
+    db = get_connection()
+    one = db['ga_dynamic_models__aux'].find_one()
+    if not one:
+        db['ga_dynamic_models__aux'].save({
+            "update_time" : datetime.utcnow()
+        }, safe=True)
+
+def reload_if_updated(mytime, name):
+    fresh = get_connection()['ga_dynamic_models__aux'].find_one()
+    if not fresh:
+        declare_updated()
+        fresh = get_connection()['ga_dynamic_models__aux'].find_one()
+    if mytime < fresh['update_time']:
+        del sys.modules[name]
+        importlib.import_module(name)
+        return True
+    else:
+        return False
+
+
+
+
