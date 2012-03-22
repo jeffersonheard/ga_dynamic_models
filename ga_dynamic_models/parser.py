@@ -1,3 +1,13 @@
+"""
+This is not terribly well documented, but the Parser transforms a dictionary contained in the database into a Model or
+Resource class.  It may call methods, import modules, and do all kinds of hocus-pocus to do its job, so when letting
+users declare models on their own, make sure you do so in a secure way and validate that models are actual real models.
+
+This can be generalized to a class declaration, so long as the class declaration is done in the Django ORM style.  Thus
+you could also use this to declare models in MongoEngine or a similar ORM.  YOu cannot define new methods, but you can
+define class attributes all you want.  For more on how to do this, see :py:mod:`ga_dynamic_models.utils`.
+"""
+
 import importlib
 import ga_ows.utils
 

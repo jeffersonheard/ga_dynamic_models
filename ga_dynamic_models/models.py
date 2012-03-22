@@ -3,7 +3,9 @@
 """
 This module is insane.  What it does, effectively, is construct Models from objects  listed in a MongoDB database.
 Quite a lot of functionality you'd expect could only be achieved through actual physical declaration of a class can be
-done here.
+done here.  One thing that's essential right now, thoguh is that the WSGI container **must** be restarted after a model
+is declared.  There's probably a way around it, but right now I don't know it.  A task for doing this, if you're using
+this with Geoanalytics, is declared in tasks.py and can be called via Celery's task mechanism.
 
 A few meta-"types" we'll define here.  A callable is represented in JSON as::
 
