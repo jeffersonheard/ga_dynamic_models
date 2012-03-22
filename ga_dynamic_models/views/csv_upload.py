@@ -1,5 +1,7 @@
+
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.db import transaction
+from ga_dynamic_models import tasks
 
 from ga_dynamic_models import utils
 import csv
@@ -141,3 +143,7 @@ class CSVCreateModelView(FormView):
 
 class CSVSuccessView(TemplateView):
     template_name = 'ga_dynamic_models/csv_load_data_success.template.html'
+
+    def render_to_response(self, context, **response_kwargs):
+        tasks.restart_ga.delay()
+        return super(CSVSuccessView.render_to_response(context, **response_kwargs))
