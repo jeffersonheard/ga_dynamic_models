@@ -34,11 +34,11 @@ These are used by other apps as well, and effectively create a routing mechanism
 Getting started
 ===============
 
-This app is still very early in its development stage.  Although it is working, parts of the application regarding
-management are currently lacking. Currently there are no management views setup for this application.  The dynamic
-models and APIs themselves are not listed in the admin application.  Furthermore there are no default forms setup for
-creating dynamic models.  There will be soon, but for now this application seems useful and generic enough to make
-available.
+This app is still very early in its development stage.  Although it is working,
+parts of the application regarding management are currently lacking. Currently
+there are no management views setup for this application.  Furthermore there
+are no default forms setup for creating dynamic models.  There will be soon,
+but for now this application seems useful and generic enough to make available.
 
 Once you have fulfilled the main requirements, add ``ga_dynamic_models`` to your INSTALLED_APPS section in Django's
 settings, and add an entry for ga_dynamic_models.urls in your main ``urls.py``.  This will create an endpoint at
