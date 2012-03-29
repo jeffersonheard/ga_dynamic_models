@@ -35,4 +35,4 @@ for res in _dynamic_model_resources:
         __all__.append(res['name'])
         api.register(cls())
     except Exception as e:
-        _log.error('Trouble creating resource {res}'.format(res=res), str(e))
+        _log.error(str(e))
