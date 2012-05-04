@@ -511,3 +511,11 @@ def get_model(model):
         raise AttributeError("No such model")
 
 
+def get_models():
+    try:
+        del sys.modules['ga_dynamic_models.models']
+    except KeyError:
+        pass
+
+    models = importlib.import_module('ga_dynamic_models.models')
+    return models.__all__

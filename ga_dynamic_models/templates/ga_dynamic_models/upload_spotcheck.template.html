@@ -1,0 +1,22 @@
+<div class='rowcount'>Total number of rows: {{ rowcount }}</div>
+<table>
+<tr class="crosscheck_row">
+{% for name, cls in column_names %}
+    <th class="crosscheck_header {{ cls }}">{{ name }}</th>
+{% endfor %}
+</tr>
+
+<tr class="crosscheck_row">
+{% for dtype,cls in datatypes %}
+    <td class="crosscheck_datatype crosscheck_cell {{ cls }}">{{ dtype }}</td>
+{% endfor %}
+</tr>
+
+{% for row in rows %}
+    <tr class='crosscheck_row'>
+    {% for value, cls in row %}
+        <td class="crosscheck_cell {{ cls }}">{{ value }}</td>
+    {% endfor %}
+    </tr>
+{% endfor %}
+</table>

@@ -1,12 +1,16 @@
 
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.db import transaction
+from django import forms
+from django import shortcuts
+from django.template.context import RequestContext
 from ga_dynamic_models import tasks
 
 from ga_dynamic_models import utils
 import csv
 import re
-from django.views.generic import FormView, TemplateView
+from django.views.generic import TemplateView, FormView
+from django.views.generic.edit import BaseFormView
 from django import forms
 from logging import getLogger
 from ga_ows.utils import parsetime
@@ -147,3 +151,107 @@ class CSVSuccessView(TemplateView):
     def render_to_response(self, context, **response_kwargs):
         tasks.restart_ga.delay()
         return super(CSVSuccessView.render_to_response(context, **response_kwargs))
+
+class CSVUploadView2(TemplateView):
+    template_name = 'ga_dynamic_models/csv_upload_view2.template.html'
+    validates_columns = False
+    columns_validated = None
+
+    def get_context_data(self, **kwargs):
+            ctx = {}
+            ctx['existing_models'] = zip(utils.get_models(), utils.get_models())
+            ctx['validates_columns'] = self.validates_columns
+            ctx['columns_validated'] = self.columns_validated
+            return RequestContext(self.request, dict=ctx)
+
+class CSVUploadAcceptForm(forms.Form):
+    file = forms.FileField()
+
+
+class CSVUploadAccept(FormView):
+    file_must_contain_columns = set()
+    column_valid_values = {}
+    column_invalid_values = {}
+    template_name = ''
+
+    form_class = CSVUploadAcceptForm
+
+    def form_valid(self, form):
+        try:
+            data = re.sub("\r", "\n", form.cleaned_data['file'].read())
+            csv_reader = csv.reader(StringIO.StringIO(data))
+            column_verbose_names = [name.strip() for name in csv_reader.next()]
+            column_short_names = [munge_col_to_name(name) for name in column_verbose_names]
+            datatypes = [t.strip() for t in csv_reader.next()]
+
+            self.request.session['uploaded_csv_data'] = data
+            self.request.session['datatypes'] = datatypes
+            self.request.session['column_short_names'] = column_short_names
+            self.request.session['column_verbose_names'] = column_verbose_names
+
+
+            col_indices = dict(zip(column_short_names, range(len(column_short_names))))
+            if self.file_must_contain_columns:
+                if self.file_must_contain_columns.intersection(column_short_names) != self.file_must_contain_columns:
+                    raise ValueError("File must contain columns: {cols}".format(cols=', '.join(self.file_must_contain_columns)))
+
+            rowcount = 1
+            errors = []
+            rows = [csv_reader.next()]
+            for row in csv_reader:
+                if rowcount <= 5:
+                    rows.append(row)
+                rowcount += 1
+                if self.column_valid_values:
+                    for col in self.column_valid_values:
+                        ix = col_indices[col]
+                        if row[ix] not in self.column_valid_values[col]:
+                            errors.append("Error on row {row}, column {col}: '{val}' is not in the list of valid values. Check its spelling and capitalization.".format(
+                                row = rowcount,
+                                col = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"[ix],
+                                val = row[ix]
+                            ))
+
+                if self.column_invalid_values:
+                    for col in self.column_invalid_values:
+                        ix = col_indices[col]
+                        if row[ix]  in self.column_invalid_values[col]:
+                            errors.append("Error on row {row}, column {col}: '{val}' is an invalid value. Check its spelling and capitalization.".format(
+                                row = rowcount,
+                                col = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"[ix],
+                                val = row[ix]
+                            ))
+
+            if errors:
+                return shortcuts.render_to_response('ga_dynamic_models/upload_error.template.html', { 'errors' : errors })
+
+            indexed = []
+            for col_num, datatype in enumerate(datatypes):
+                if not datatype:
+                    raise ValueError("data in column '{colname}' has no data type associated with it".format(colname=column_verbose_names[col_num]))
+                else:
+                    if datatype[0] == '*':
+                        datatype = datatype[1:]
+                        indexed.append('indexed_column')
+                    else:
+                        indexed.append('column')
+
+                if datatype not in ['CharField','IntegerField','FloatField','BooleanField']:
+                    raise ValueError("datatype for column '{colname}' was '{dtype}', but must be in the set [CharField, IntegerField, FloatField, or BooleanField]".format(
+                        colname = column_verbose_names[col_num],
+                        dtype = datatype
+                    ))
+
+            return shortcuts.render_to_response('ga_dynamic_models/upload_spotcheck.template.html', {
+                'column_names' : zip(column_verbose_names, indexed),
+                'datatypes' : zip(datatypes, indexed),
+                'rows' : [zip(row, indexed) for row in rows],
+                'rowcount' : rowcount
+            })
+        except Exception as ex:
+            return shortcuts.render_to_response('ga_dynamic_models/upload_error.template.html', { 'errors' : [str(ex)] })
+
+    def form_invalid(self, form):
+        return shortcuts.render_to_response('ga_dynamic_models/upload_error.template.html', {'errors' : ["No file or empty file uploaded"] })
+
+

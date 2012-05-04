@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Upload Comma-delimited file as model</title>
+
+    <link rel="stylesheet" href="{{ STATIC_URL }}jquery-ui-1.8.20/css/pepper-grinder/jquery-ui-1.8.20.custom.css">
+
+    <script type="text/javascript" src='{{ STATIC_URL }}jquery-ui-1.8.20/js/jquery-1.7.2.min.js'></script>
+    <script type="text/javascript" src='{{ STATIC_URL }}jquery-ui-1.8.20/js/jquery-ui-1.8.20.custom.min.js'></script>
+    <script type='text/javascript' src='{{ STATIC_URL }}jquery.form.js'></script>
+    <script type="text/javascript" src='{{ STATIC_URL }}djajax.js'></script>
+
+    <script type="text/javascript">
+        $(function() {
+            $("input:submit").button();
+            $("input:reset").button();
+            $("input:file").button();
+
+            $("#fileupload").ajaxForm(function(data, textStatus, xHr) {
+                $("#crosscheck>*").detach();
+                $("#crosscheck").append(data);
+
+                $.get('schema_editor/', function(data, textStatus, xHr) {
+                    $("#schema_editor>*").detach();
+                    $("#schema_editor").append(data);
+                });
+            });
+
+        });
+    </script>
+
+    <style type="text/css">
+        body {
+            font-family: Helvetica,Arial,sans-serif;
+            width: 800px;
+            margin-left:150px;
+        }
+        h1.title {
+            padding-bottom: 1.5em;
+            color: #b83400;
+            font-weight: normal;
+        }
+        h3 {
+            color: #b83400;
+        }
+        div.control_group {
+            margin-bottom: 0.66em;
+        }
+
+        .help {
+            margin: 1.5em;
+            text-align: justify;
+        }
+        #crosscheck {
+            height:200px;
+            overflow-x: auto;
+            white-space: nowrap;
+            border: solid 1px black;
+            margin: 1.5em;
+        }
+
+        .crosscheck_header {
+            background-color: #f4debf;
+            font-size: 12px;
+        }
+        .crosscheck_datatype {
+            background-color: #729c50;
+            font-size: 12px;
+        }
+        .indexed_column {
+            background-color: #5f9cc5;
+        }
+        .crosscheck_cell {
+            width : 150px;
+            overflow: hidden;
+        }
+        .crosscheck_row {
+            font-size: 12px;
+        }
+        .rowcount {
+            margin-bottom: 0.5em;
+            color: #b83400;
+            font-size: 10px;
+        }
+
+        .error {
+            color: red;
+            font-size: 9pt;
+        }
+        #fileupload {}
+        #confirm {}
+    </style>
+</head>
+<body>
+    <h1 class='title'>Upload a comma-delimited file as a model</h1>
+    <h3>About the data format</h3>
+    <div class='help'>
+        The format for a comma-delimited file is ".CSV".  You can create this kind of file in Microsoft Excel or
+        OpenOffice Calc by selecting "save as" and changing the format to "CSV Comma Delimited File".  The first row of
+        the file should be only column headers.  The column headers are free-form and
+        will be translated to database columns by removing all non alphanumeric characters, replacing spaces with
+        underscores, and other normalization steps.  The free-form column name will remain as the title of the column
+        in the schema URL and the admin tool.
+
+        The second row of the file should contain column types.  Right now these are limited to <b>StringField, IntegerField,
+        </b> and <b>FloatField</b>.  Prefacing the column type with a star (*) with no spaces will cause that column to
+        be indexed by the database, speeding up lookups on that column.  This row must be spelled correctly, with no
+        spaces between words and capitals as shown above.
+    </div>
+
+    <h3>Step 1. Upload data and spot-check</h3>
+    <form id='fileupload' action='upload/' enctype='multipart/form-data' method='POST'>
+        {% csrf_token %}
+        <div>
+           <input type='file' name='file' id="csv" />
+            <label for="csv">Select a comma-delimited file</label>
+        </div>
+        <div><input type="submit" class='button' value='Validate file'>
+        <input type="reset" class='button' value='Clear'></div>
+    </form>
+
+    <div class='help'>
+        Columns marked in blue will be indexed by the database, providing fast lookup.  The first few rows of the data
+    that you uploaded will be placed here when you click 'validate file'.  Look over these and see if they are correct.
+    If they are not, edit the file in your favorite editor and click "validate file" again to see your updates.
+        {% if validates_columns %}
+            Also, this application validates the data contained in the following columns:
+            <ul>
+                {% for col in columns_validated %}
+                    <li>{{ col }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+    </div>
+
+    <!-- cross-check table for human validation that the data seems okay.
+
+        crosscheck_header shows the column titles.
+        crosscheck_dtypes shows the data types.
+        crosscheck_cells show the first few rows of data.
+
+    -->
+
+    <div id="crosscheck">
+    </div>
+
+    <h3>Step 2. Edit metadata and confirm upload.</h3>
+    <form id='confirm' action='confirm_upload/' method='POST'>
+        {% csrf_token %}
+
+
+        <div class='control_group'>
+        <label for="new_model_name">Model name:</label>
+        <input type="text" name="new_model_name" id="new_model_name"/>
+        <label for="existing_model_name">or use existing:</label>
+        <select name="existing_model_name" id="existing_model_name">
+            {% for shortname, name in existing_models %}
+                <option value='{{ shortname }}'>{{ name }}</option>
+            {% endfor %}
+        </select>
+        <label for="overwrite">Overwrite</label>
+        <input type="radio" name="write_mode" id="overwrite" checked='true'/>
+        <label for="append">Append</label>
+        <input type="radio" name="write_mode" id="append"/>
+        </div>
+        <div id="schema_editor">
+
+        </div>
+        <input class='button' type="submit" value="Confirm and upload data"/>
+    </form>
+
+</body>
+</html>
